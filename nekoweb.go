@@ -44,19 +44,11 @@ func downloadFile(url string) error {
 	}
 	defer resp.Body.Close()
 
-	filename := filepath.Base(url)
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = io.Copy(file, resp.Body)
+	_, err = io.Copy(os.Stdout, resp.Body)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("File downloaded:", filename)
 	return nil
 }
 
