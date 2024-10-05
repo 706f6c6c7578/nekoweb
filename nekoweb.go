@@ -9,27 +9,43 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/net/proxy"
 )
 
 func main() {
 	download := flag.Bool("d", false, "Download file from URL")
+	useTor := flag.Bool("T", false, "Use Tor network")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
-		fmt.Println("Usage: nekoweb [-d] [folder/]filename or URL")
+		fmt.Println("Usage: nekoweb [-d] [-T] [folder/]filename or URL")
 		os.Exit(1)
+	}
+
+	var client *http.Client
+	if *useTor {
+		dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:9050", nil, proxy.Direct)
+		if err != nil {
+			fmt.Println("Error creating SOCKS5 dialer:", err)
+			os.Exit(1)
+		}
+		httpTransport := &http.Transport{Dial: dialer.Dial}
+		client = &http.Client{Transport: httpTransport}
+	} else {
+		client = &http.Client{}
 	}
 
 	if *download {
 		url := flag.Args()[0]
-		err := downloadFile(url)
+		err := downloadFile(url, client)
 		if err != nil {
 			fmt.Println("Error downloading file:", err)
 			os.Exit(1)
 		}
 	} else {
 		filepathArg := flag.Args()[0]
-		err := uploadFile(filepathArg)
+		err := uploadFile(filepathArg, client)
 		if err != nil {
 			fmt.Println("Error uploading file:", err)
 			os.Exit(1)
@@ -37,8 +53,8 @@ func main() {
 	}
 }
 
-func downloadFile(url string) error {
-	resp, err := http.Get(url)
+func downloadFile(url string, client *http.Client) error {
+	resp, err := client.Get(url)
 	if err != nil {
 		return err
 	}
@@ -52,7 +68,7 @@ func downloadFile(url string) error {
 	return nil
 }
 
-func uploadFile(filepathArg string) error {
+func uploadFile(filepathArg string, client *http.Client) error {
 	folder := filepath.Dir(filepathArg)
 	filename := filepath.Base(filepathArg)
 
@@ -94,7 +110,6 @@ func uploadFile(filepathArg string) error {
 	req.Header.Set("Authorization", "your-nekoweb-api-key")
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
